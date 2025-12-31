@@ -8,7 +8,7 @@ Place the pak file in Vein\Vein\Content\Paks folder.
 CSV files can be edited online or offline using a regular text editor. If using Excel, you need to save as UTF-8-BOM first to make Excel read it as UTF-8.
 
 ### Translation Rules
-* CSV files use English commas to separate 3 columns: first column is the key (cannot be changed), second column is the source English text, third column is the Translation (Chinese).
+* CSV files use English commas to separate 3 columns: first column is the key (cannot be changed), second column is the source English text, third column is the Translation.
 * Do not translate tags with <> and {}
 * Do not translate settings like Low Medium High Custom, etc., as it will cause the page to not change when modifying settings.
 

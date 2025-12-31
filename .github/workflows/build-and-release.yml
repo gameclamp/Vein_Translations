@@ -1,0 +1,142 @@
+name: Build and Release VEIN localization pak
+
+on:
+  push:
+    paths:
+      - 'Game.locres_*.csv'
+      - '.github/workflows/build-and-release.yml'
+
+jobs:
+  build-pak:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET 8 runtime
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0.x'
+
+      # -----------------------------
+      # Determine languages to build
+      # -----------------------------
+      - name: Determine which languages to build
+        id: determine_languages
+        shell: pwsh
+        run: |
+          $before = "${{ github.event.before }}"
+          $after  = "${{ github.sha }}"
+
+          Write-Host "Diff range: $before -> $after"
+          $changes = git diff --name-only $before $after
+          $languages = @()
+
+          foreach ($change in $changes) {
+            if ($change -match '^Game\.locres_(\w+)\.csv$') {
+              $languages += $matches[1]
+            }
+          }
+
+          $languages = $languages | Sort-Object -Unique
+
+          # workflow modified, build all
+          if ($changes -contains ".github/workflows/build-and-release.yml") {
+            Write-Host "Workflow changed, building ALL languages"
+            $languages = Get-ChildItem -Filter "Game.locres_*.csv" |
+              ForEach-Object {
+                if ($_.Name -match 'Game\.locres_(\w+)\.csv') { $matches[1] }
+              } | Sort-Object -Unique
+          }
+
+          if ($languages.Count -eq 0) {
+            Write-Host "No localization files changed, nothing to build."
+          }
+
+          Write-Host "Languages to build: $($languages -join ', ')"
+          "languages=$($languages -join ',')" >> $env:GITHUB_OUTPUT
+
+      # -----------------------------
+      # Build pak for each language
+      # -----------------------------
+      - name: Build pak files
+        if: steps.determine_languages.outputs.languages != ''
+        shell: pwsh
+        run: |
+          $languages = "${{ steps.determine_languages.outputs.languages }}".Split(',')
+
+          foreach ($lang in $languages) {
+            Write-Host "==== Building $lang ===="
+
+            $csv = "Game.locres_$lang.csv"
+            if (!(Test-Path $csv)) {
+              throw "CSV file not found: $csv"
+            }
+
+            # UE localization import
+            if (Test-Path "Game.locres.csv") {
+              Remove-Item "Game.locres.csv" -Force
+            }
+            Move-Item $csv Game.locres.csv -Force
+
+            & "$PWD\UE4localizationsTool.exe" -import Game.locres.csv -csv | Out-Null
+
+            # Prepare output structure
+            $dest = "VEIN_$lang\Vein\Content\Localization\Game\en"
+            New-Item -ItemType Directory -Force -Path $dest | Out-Null
+
+            Copy-Item $PWD\Game.locres "$dest\Game.locres" -Force
+
+            # Pack
+            & "$PWD\repak.exe" pack "VEIN_$lang" --compression Zlib
+          }
+
+      # -----------------------------
+      # Create release
+      # -----------------------------
+      - name: Set release tag
+        id: set_tag
+        shell: pwsh
+        run: |
+          $month = (Get-Date).ToString("yyyy-MM")
+          "tag=localization-$month" >> $env:GITHUB_OUTPUT
+          "month=$month" >> $env:GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.set_tag.outputs.tag }}
+          name: "VEIN Localization 0.22h16 - ${{ steps.set_tag.outputs.month }}"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # -----------------------------
+      # Upload ALL built pak files
+      # -----------------------------
+      - name: Upload pak files
+        if: steps.determine_languages.outputs.languages != ''
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $languages = "${{ steps.determine_languages.outputs.languages }}".Split(',')
+
+          foreach ($lang in $languages) {
+            $pak = "VEIN_$lang.pak"
+            if (!(Test-Path $pak)) {
+              throw "Pak not found: $pak"
+            }
+
+            Write-Host "Uploading $pak"
+            gh release upload `
+              "${{ steps.set_tag.outputs.tag }}" `
+              $pak `
+              --clobber
+          }

@@ -83,7 +83,7 @@ jobs:
               Remove-Item "Game.locres.csv" -Force
             }
             Move-Item $csv Game.locres.csv -Force
-            Copy-Item Game-org.locres.csv Game.locres.csv -Force
+            Copy-Item Game-org.locres Game.locres -Force
 
             & "$PWD\UE4localizationsTool.exe" -import Game.locres.csv -csv | Out-Null
 

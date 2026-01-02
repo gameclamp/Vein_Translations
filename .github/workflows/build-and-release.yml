@@ -83,6 +83,7 @@ jobs:
               Remove-Item "Game.locres.csv" -Force
             }
             Move-Item $csv Game.locres.csv -Force
+            Copy-Item Game-org.locres.csv Game.locres.csv -Force
 
             & "$PWD\UE4localizationsTool.exe" -import Game.locres.csv -csv | Out-Null
 
@@ -90,7 +91,7 @@ jobs:
             $dest = "VEIN_$lang\Vein\Content\Localization\Game\en"
             New-Item -ItemType Directory -Force -Path $dest | Out-Null
 
-            Copy-Item $PWD\Game.locres "$dest\Game.locres" -Force
+            Move-Item $PWD\Game.locres "$dest\Game.locres" -Force
 
             # Pack
             & "$PWD\repak.exe" pack "VEIN_$lang" --compression Zlib

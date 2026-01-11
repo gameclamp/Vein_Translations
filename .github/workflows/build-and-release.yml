@@ -112,7 +112,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.set_tag.outputs.tag }}
-          name: "VEIN Localization 0.22h16 - ${{ steps.set_tag.outputs.month }}"
+          name: "VEIN Localization 0.22h17 - ${{ steps.set_tag.outputs.month }}"
           draft: false
           prerelease: false
         env:
